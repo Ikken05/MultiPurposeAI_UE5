@@ -16,26 +16,34 @@ AEnemySpawner::AEnemySpawner()
 }
 
 // Function to spawn an enemy and assign assets based on the data asset provided
-ACharacter* AEnemySpawner::SpawnEnemy(const UCharacterDataAsset* CharacterDataAsset)
+ACharacter* AEnemySpawner::SpawnEnemy(const FEnemySpawnData& EnemyData)
 {
-    if (!CharacterDataAsset)
+    if (!EnemyData.EnemyDataAsset)
     {
-        UE_LOG(LogTemp, Error, TEXT("Character Data Asset is invalid!"));
+        UE_LOG(LogTemp, Warning, TEXT("Enemy data asset is null! Skipping spawn."));
         return nullptr;
     }
 
-    // Spawn the enemy character from the provided class
-    ACharacter* SpawnedCharacter = GetWorld()->SpawnActor<ACharacter>(CharacterDataAsset->CharacterClass);
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return nullptr;
+    }
 
-    FVector SpawnPoint = GetActorLocation();
-
-    SpawnedCharacter->SetActorLocation(SpawnPoint,false,nullptr,ETeleportType::None);
+    // Spawn the enemy
+    ACharacter* SpawnedCharacter = World->SpawnActor<ACharacter>(
+        ACharacter::StaticClass(), // Replace with your base AI character class
+        EnemyData.SpawnTransform);
 
     if (SpawnedCharacter)
     {
-        // Initialize the enemy with specific assets and behavior tree
-        InitializeEnemy(SpawnedCharacter, CharacterDataAsset);
+        // Initialize the spawned character with its data asset
+        InitializeEnemy(SpawnedCharacter, EnemyData.EnemyDataAsset);
     }
+
+    SpawnedCharacter->SetActorLocation(EnemyData.SpawnTransform.GetLocation(), false, nullptr, ETeleportType::None);
+    FRotator SpawnRotation = EnemyData.SpawnTransform.GetRotation().Rotator();
+    SpawnedCharacter->SetActorRotation(SpawnRotation);
 
     return SpawnedCharacter;
 }
@@ -60,7 +68,54 @@ void AEnemySpawner::InitializeEnemy(ACharacter* SpawnedCharacter, const UCharact
 
 void AEnemySpawner::BeginPlay()
 {
-    if(!EnemyDataAsset)
-        return;
-    SpawnEnemy(EnemyDataAsset);
+    for (const FEnemySpawnData& EnemyData : EnemiesToSpawn)
+    {
+        SpawnEnemy(EnemyData);
+    }
+}
+
+void AEnemySpawner::OnConstruction(const FTransform& Transform)
+{
+    Super::OnConstruction(Transform);
+
+    if (bShowSpawnPoints)
+    {
+        // Clear existing debug spheres
+        FlushPersistentDebugLines(GetWorld());
+
+        for (const FEnemySpawnData& EnemyData : EnemiesToSpawn)
+        {
+            if (EnemyData.SpawnTransform.GetLocation() != FVector::ZeroVector)
+            {
+                DrawDebugSphere(
+                    GetWorld(),
+                    EnemyData.SpawnTransform.GetLocation(),
+                    EnemyData.DebugSphereRadius,
+                    EnemyData.NumberOfSegments,
+                    EnemyData.SphereColor,
+                    EnemyData.bPersistenLine,
+                    EnemyData.Duration      
+                );
+                // Draw a debug arrow to indicate the rotation
+                FVector Start = EnemyData.SpawnTransform.GetLocation();
+                FVector ForwardVector = EnemyData.SpawnTransform.GetRotation().GetRightVector();
+                FVector ArrowEnd = Start + (ForwardVector * 100.0f);
+                DrawDebugDirectionalArrow(
+                    GetWorld(),
+                    EnemyData.SpawnTransform.GetLocation(),
+                    ArrowEnd,
+                    50.0f,       // Arrow size
+                    FColor::Blue, // Color
+                    true,         // Persistent
+                    0.0f,         // Never expires
+                    0,            // Depth priority
+                    2.0f          // Arrow thickness
+                );
+            }
+        }
+    }
+}
+
+void AEnemySpawner::AssignSubtrees(ACharacter* SpawnedEnemy)
+{
 }

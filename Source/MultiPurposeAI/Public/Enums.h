@@ -3,12 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/NoExportTypes.h"
-#include "UtilityClass.generated.h"
 
-/**
- * 
- */
 
 UENUM(BlueprintType)
 enum class EAICharacterState : uint8
@@ -20,10 +15,3 @@ enum class EAICharacterState : uint8
     Standby     UMETA(DisplayName = "Standby")
 };
 
-
-UCLASS()
-class MULTIPURPOSEAI_API UUtilityClass : public UObject
-{
-	GENERATED_BODY()
-	
-};

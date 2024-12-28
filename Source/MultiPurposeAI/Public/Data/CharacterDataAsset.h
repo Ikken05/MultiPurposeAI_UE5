@@ -4,8 +4,11 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h" 
-#include "../Utilities/UtilityClass.h"
+#include "Enums.h"
 #include "CharacterDataAsset.generated.h"
+
+
+
 
 
 class UBehaviorTree;
@@ -16,6 +19,8 @@ class UAnimInstance;
  * Data Asset for AI Character Settings
  * Allows to setup the visuals of the enemy as well as its behavior via subtrees
  */
+
+
 UCLASS(BlueprintType)
 class MULTIPURPOSEAI_API UCharacterDataAsset : public UDataAsset
 {
