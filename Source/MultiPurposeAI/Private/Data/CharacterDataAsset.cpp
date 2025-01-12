@@ -5,4 +5,6 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "Engine/SkeletalMesh.h"     
 #include "Animation/AnimInstance.h" 
+#include "Perception/AISenseConfig.h"
+#include "Perception/AIPerceptionTypes.h"
 

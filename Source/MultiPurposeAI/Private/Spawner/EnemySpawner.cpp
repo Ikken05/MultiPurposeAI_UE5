@@ -5,6 +5,10 @@
 #include "GameFramework/Character.h"
 #include "Engine/World.h"
 #include "BehaviorTree/BehaviorTree.h"
+#include "AIController.h"
+#include "Perception/AIPerceptionComponent.h"
+#include "Perception/AISenseConfig.h"
+#include "BehaviorTree/BlackboardComponent.h" 
 #include "Data/CharacterDataAsset.h"
 
 // Constructor implementation
@@ -13,6 +17,20 @@ AEnemySpawner::AEnemySpawner()
     // Default values, can be changed in the editor or on spawn
     DefaultSkeletalMesh = nullptr;
     DefaultAnimBlueprint = nullptr;
+}
+
+void AEnemySpawner::BeginPlay()
+{
+    for (const FEnemySpawnData& EnemyData : EnemiesToSpawn)
+    {
+        ACharacter* SpawnedEnemy = SpawnEnemy(EnemyData);
+        if (SpawnedEnemy)
+        {
+
+            SpawnedEnemies.Add(SpawnedEnemy);
+        }
+
+    }
 }
 
 // Function to spawn an enemy and assign assets based on the data asset provided
@@ -32,13 +50,29 @@ ACharacter* AEnemySpawner::SpawnEnemy(const FEnemySpawnData& EnemyData)
 
     // Spawn the enemy
     ACharacter* SpawnedCharacter = World->SpawnActor<ACharacter>(
-        ACharacter::StaticClass(), // Replace with your base AI character class
+        EnemyData.EnemyDataAsset->CharacterClass, 
         EnemyData.SpawnTransform);
 
     if (SpawnedCharacter)
     {
-        // Initialize the spawned character with its data asset
-        InitializeEnemy(SpawnedCharacter, EnemyData.EnemyDataAsset);
+        AAIController* AIController = Cast<AAIController>(SpawnedCharacter->GetController());
+
+        // If the character doesn't have a controller, create one
+        if (!AIController)
+        {
+            // Spawn the default AI controller for the character
+            SpawnedCharacter->SpawnDefaultController();
+
+            // Get the newly created controller
+            AIController = Cast<AAIController>(SpawnedCharacter->GetController());
+        }
+
+        // Initialize the enemy with the assigned AIController
+        if (AIController)
+        {
+            InitializeEnemy(SpawnedCharacter, EnemyData.EnemyDataAsset, AIController);
+            AssignAIPerceptionConfig(SpawnedCharacter, EnemyData.EnemyDataAsset, AIController);
+        }
     }
 
     SpawnedCharacter->SetActorLocation(EnemyData.SpawnTransform.GetLocation(), false, nullptr, ETeleportType::None);
@@ -49,7 +83,7 @@ ACharacter* AEnemySpawner::SpawnEnemy(const FEnemySpawnData& EnemyData)
 }
 
 // Function to initialize the enemy's mesh, animation blueprint, and behavior tree
-void AEnemySpawner::InitializeEnemy(ACharacter* SpawnedCharacter, const UCharacterDataAsset* CharacterDataAsset)
+void AEnemySpawner::InitializeEnemy(ACharacter* SpawnedCharacter, const UCharacterDataAsset* CharacterDataAsset, AAIController* AICharacterController)
 {
     if (SpawnedCharacter)
     {
@@ -64,14 +98,96 @@ void AEnemySpawner::InitializeEnemy(ACharacter* SpawnedCharacter, const UCharact
             SpawnedCharacter->GetMesh()->SetAnimInstanceClass(CharacterDataAsset->AnimationBlueprint);
         }
     }
+
+
+
+    bool bSuccess = AICharacterController->RunBehaviorTree(CharacterDataAsset->MainBT);
+    if(bSuccess)
+    {
+        UBlackboardComponent* BlackboardComp = AICharacterController->GetBlackboardComponent();
+        if (BlackboardComp)
+        {
+            // Get the UEnum for EAICharacterState
+            UEnum* EnumPtr = FindObject<UEnum>(ANY_PACKAGE, TEXT("EAICharacterState"), true);
+            
+            if (!EnumPtr)
+            {
+                UE_LOG(LogTemp, Error, TEXT("Enum EAICharacterState not found!"));
+                return;
+            }
+
+            for (const auto& Pair : CharacterDataAsset->Subtrees)
+            {
+                EAICharacterState State = Pair.Key;         // Key: AI character state
+                UBehaviorTree* Subtree = Pair.Value;       // Value: Behavior tree
+
+                if (Subtree)
+                {
+                    // Get the display name of the enum value (e.g., "Patrol" instead of "EAICharacterState::Patrol")
+                    FString StateString = EnumPtr->GetDisplayNameTextByValue((int64)State).ToString();
+                    // Create the blackboard key with the format EnumName + "SubTree"
+                    FString BlackboardKeyString = StateString + "SubTree";
+                    FName BlackboardKey = FName(*BlackboardKeyString);
+
+                    // Set the behavior tree as an object in the blackboard
+                    BlackboardComp->SetValueAsObject(BlackboardKey, Subtree);
+                }
+            }
+        }
+    }
 }
 
-void AEnemySpawner::BeginPlay()
+
+
+
+
+void AEnemySpawner::AssignAIPerceptionConfig(ACharacter* SpawnedCharacter, const UCharacterDataAsset* CharacterDataAsset, AAIController* AICharacterController)
 {
-    for (const FEnemySpawnData& EnemyData : EnemiesToSpawn)
+    if (!SpawnedCharacter || !CharacterDataAsset || !AICharacterController)
     {
-        SpawnEnemy(EnemyData);
+        UE_LOG(LogTemp, Warning, TEXT("Invalid parameters in AssignAIPerceptionConfig"));
+        return;
     }
+
+    UAIPerceptionComponent* PerceptionComponent = AICharacterController->FindComponentByClass<UAIPerceptionComponent>();
+
+    if (!PerceptionComponent)
+    {
+        // Create and register a new Perception Component at runtime
+        PerceptionComponent = NewObject<UAIPerceptionComponent>(AICharacterController);
+        if (PerceptionComponent)
+        {
+            PerceptionComponent->RegisterComponent();
+            AICharacterController->SetPerceptionComponent(*PerceptionComponent);
+        }
+    }
+
+    if (!PerceptionComponent)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Failed to create or find PerceptionComponent!"));
+        return;
+    }
+
+    // Configure Senses from Data Asset
+    for (const TObjectPtr<UAISenseConfig>& SenseConfig : CharacterDataAsset->SensesConfig)
+    {
+        if (SenseConfig)
+        {
+            PerceptionComponent->ConfigureSense(*SenseConfig);
+        }
+    }
+
+    // Set Dominant Sense
+    if (CharacterDataAsset->DominantSense)
+    {
+        PerceptionComponent->SetDominantSense(CharacterDataAsset->DominantSense);
+    }
+
+    // Ensure activation
+    PerceptionComponent->Activate();
+
+    // Add dynamic delegate for perception updates
+    PerceptionComponent->OnPerceptionUpdated.AddDynamic(this, &AEnemySpawner::OnPerceptionUpdated);
 }
 
 void AEnemySpawner::OnConstruction(const FTransform& Transform)
@@ -98,24 +214,34 @@ void AEnemySpawner::OnConstruction(const FTransform& Transform)
                 );
                 // Draw a debug arrow to indicate the rotation
                 FVector Start = EnemyData.SpawnTransform.GetLocation();
-                FVector ForwardVector = EnemyData.SpawnTransform.GetRotation().GetRightVector();
-                FVector ArrowEnd = Start + (ForwardVector * 100.0f);
+                FVector ForwardVector = EnemyData.SpawnTransform.GetRotation().Vector();
+                FVector ArrowEnd = Start + (ForwardVector * EnemyData.ArrowLength);
                 DrawDebugDirectionalArrow(
                     GetWorld(),
                     EnemyData.SpawnTransform.GetLocation(),
                     ArrowEnd,
-                    50.0f,       // Arrow size
-                    FColor::Blue, // Color
-                    true,         // Persistent
-                    0.0f,         // Never expires
+                    EnemyData.DebugSphereRadius,       // Arrow size
+                    EnemyData.SphereColor, // Color
+                    EnemyData.bPersistenLine,        // Persistent
+                    EnemyData.Duration,         // Never expires
                     0,            // Depth priority
-                    2.0f          // Arrow thickness
+                    EnemyData.ArrowThickness          // Arrow thickness
                 );
             }
         }
     }
 }
 
-void AEnemySpawner::AssignSubtrees(ACharacter* SpawnedEnemy)
+void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
 {
+    // Handle perception updates
+    for (AActor* Actor : UpdatedActors)
+    {
+        if (Actor)
+        {
+            UE_LOG(LogTemp, Warning, TEXT("Perceived Actor: %s"), *Actor->GetName());
+        }
+    }
 }
+
+

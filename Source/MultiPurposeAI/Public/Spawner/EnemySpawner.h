@@ -3,12 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Enums.h"
 #include "UObject/NoExportTypes.h"
 #include "EnemySpawner.generated.h"
 
 
 
 class ACharacter;
+class AAIController;
 class UBehaviorTree;
 class USkeletalMesh;
 class UAnimInstance;
@@ -46,6 +48,11 @@ struct FEnemySpawnData
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug")
     float Duration;
 
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug")
+    float ArrowThickness;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Debug")
+    float ArrowLength;
 
 };
 
@@ -83,7 +90,7 @@ protected:
 
     // Helper methods for initializing enemy with specific assets
     UFUNCTION(BlueprintCallable, Category ="Init")
-    void InitializeEnemy(ACharacter* SpawnedCharacter, const UCharacterDataAsset* CharacterDataAsset);
+    void InitializeEnemy(ACharacter* SpawnedCharacter, const UCharacterDataAsset* CharacterDataAsset, AAIController* AICharacterController);
 
     // To add mapping context
     virtual void BeginPlay();
@@ -96,13 +103,22 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI")
     TSubclassOf<UAnimInstance> DefaultAnimBlueprint;
 
+    // Property to store the default animation blueprint for enemies
+    UPROPERTY(BlueprintReadOnly, Category = "AI")
+    TArray<ACharacter*> SpawnedEnemies;
+
 protected:
+
     virtual void OnConstruction(const FTransform& Transform) override;
+
 
 private:
 
-    UFUNCTION(BlueprintCallable, Category = "AI|SubTrees")
-    void AssignSubtrees(ACharacter* SpawnedEnemy);
+    // Helper method to configure AI Perception for the spawned character
+    UFUNCTION(BlueprintCallable, Category = "AI|Perception")
+    void AssignAIPerceptionConfig(ACharacter* SpawnedCharacter, const UCharacterDataAsset* CharacterDataAsset, AAIController* AICharacterController);
 
-	
+    UFUNCTION(BlueprintCallable, Category = "AI|Perception")
+    void OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors);
+
 };

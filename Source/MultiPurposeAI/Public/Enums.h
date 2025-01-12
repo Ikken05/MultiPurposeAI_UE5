@@ -12,6 +12,6 @@ enum class EAICharacterState : uint8
     Patrol      UMETA(DisplayName = "Patrol"),
     Attack      UMETA(DisplayName = "Attack"),
     Support     UMETA(DisplayName = "Support"),
-    Standby     UMETA(DisplayName = "Standby")
+    StandBy     UMETA(DisplayName = "StandBy")
 };
 
