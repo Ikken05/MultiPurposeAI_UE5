@@ -73,7 +73,7 @@ public:
 
 public:
 
-    UPROPERTY(EditAnywhere, Category= "Spawn|Enemies")
+    UPROPERTY(EditAnywhere,BlueprintReadOnly, Category= "Spawn|Enemies")
     TArray<FEnemySpawnData> EnemiesToSpawn;
 
 #if WITH_EDITORONLY_DATA
@@ -91,6 +91,7 @@ protected:
     // Helper methods for initializing enemy with specific assets
     UFUNCTION(BlueprintCallable, Category ="Init")
     void InitializeEnemy(ACharacter* SpawnedCharacter, const UCharacterDataAsset* CharacterDataAsset, AAIController* AICharacterController);
+
 
     // To add mapping context
     virtual void BeginPlay();

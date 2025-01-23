@@ -50,6 +50,14 @@ public:
     TSubclassOf<UAISense> DominantSense;
 
     // Subtrees mapping for different behaviors
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Behavior")
+    EAICharacterState DefaultStartState;
+
+    // Subtrees mapping for different behaviors
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Behavior")
+    EAICharacterState DetectionState;
+
+    // Subtrees mapping for different behaviors
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Behavior|MainTree")
     UBehaviorTree* MainBT;
 
