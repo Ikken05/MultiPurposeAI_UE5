@@ -7,6 +7,8 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "AIController.h"
 #include "Enums.h"
+#include "Components/StateManagerComponent.h"
+#include "Components/DamageableComponent.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig.h"
 #include "BehaviorTree/BlackboardComponent.h" 
@@ -29,7 +31,7 @@ void AEnemySpawner::BeginPlay()
         {
             SpawnedEnemies.Add(SpawnedEnemy);
         }
-        
+
     }
 }
 
@@ -72,7 +74,7 @@ ACharacter* AEnemySpawner::SpawnEnemy(const FEnemySpawnData& EnemyData)
         // Initialize the enemy with the assigned AIController
         if (AIController)
         {
-            InitializeEnemy(SpawnedCharacter, EnemyData.EnemyDataAsset, AIController);           
+            InitializeEnemy(SpawnedCharacter, EnemyData.EnemyDataAsset, AIController); 
             AssignAIPerceptionConfig(SpawnedCharacter, EnemyData.EnemyDataAsset, AIController);
         }
     }
@@ -102,7 +104,7 @@ void AEnemySpawner::InitializeEnemy(ACharacter* SpawnedCharacter, const UCharact
         }
     }
 
-
+    AddComponentsToCharacter(CharacterDataAsset, SpawnedCharacter);
 
     bool bSuccess = AICharacterController->RunBehaviorTree(CharacterDataAsset->MainBT);
     if(bSuccess)
@@ -130,6 +132,18 @@ void AEnemySpawner::InitializeEnemy(ACharacter* SpawnedCharacter, const UCharact
                     BlackboardComp->SetValueAsObject(BlackboardKey, Subtree);
                 }
             }
+            UStateManagerComponent* StateManager = SpawnedCharacter->GetComponentByClass<UStateManagerComponent>();
+            if(StateManager)
+            {
+                StateManager->SetCurrentState(CharacterDataAsset->DefaultStartState);
+            }
+
+            UDamageableComponent* DamageComponent = SpawnedCharacter->GetComponentByClass<UDamageableComponent>();
+            if (DamageComponent)
+            {
+                DamageComponent->SetMaxHealth(CharacterDataAsset->MaxHealth);
+                DamageComponent->SetCurrentHealth(DamageComponent->GetMaxHealth());
+            }
 
             FName AIStateBlackboardKey = FName("AIState");
             BlackboardComp->SetValueAsEnum(AIStateBlackboardKey, static_cast<uint8>(CharacterDataAsset->DefaultStartState));
@@ -138,9 +152,50 @@ void AEnemySpawner::InitializeEnemy(ACharacter* SpawnedCharacter, const UCharact
     }
 }
 
+void AEnemySpawner::AddComponentsToCharacter(const UCharacterDataAsset* CharacterDataAsset, ACharacter* SpawnedEnemy)
+{
+    if (!SpawnedEnemy || !CharacterDataAsset)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Invalid SpawnedEnemy or CharacterDataAsset!"));
+        return;
+    }
 
+    if (CharacterDataAsset->bEnableComponents)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("Adding components to character: %s"), *SpawnedEnemy->GetName());
+        UE_LOG(LogTemp, Warning, TEXT("ComponentsToAdd has %d elements"), CharacterDataAsset->ComponentsToAdd.Num());
 
+        for (const TSubclassOf<UActorComponent>& CompClass : CharacterDataAsset->ComponentsToAdd)
+        {
+            if (!CompClass || !CompClass->IsChildOf(UActorComponent::StaticClass()))
+            {
+                UE_LOG(LogTemp, Error, TEXT("Invalid component class in ComponentsToAdd!"));
+                continue;
+            }
 
+            // Create the new Actor Component
+            UActorComponent* NewComponent = NewObject<UActorComponent>(SpawnedEnemy, CompClass);
+
+            if (NewComponent)
+            {
+                UE_LOG(LogTemp, Warning, TEXT("Successfully created component: %s"), *NewComponent->GetName());
+
+                // Register the component with the actor
+                NewComponent->RegisterComponent();
+                NewComponent->SetActive(true);
+
+                UE_LOG(LogTemp, Warning, TEXT("Registered and activated component: %s"), *NewComponent->GetName());
+
+                // Attach the component to the actor
+                SpawnedEnemy->AddOwnedComponent(NewComponent);  // Add it to the actor's owned components
+            }
+        }
+    }
+    else
+    {
+        UE_LOG(LogTemp, Warning, TEXT("bEnableComponents is false, no components added."));
+    }
+}
 
 void AEnemySpawner::AssignAIPerceptionConfig(ACharacter* SpawnedCharacter, const UCharacterDataAsset* CharacterDataAsset, AAIController* AICharacterController)
 {
@@ -176,10 +231,10 @@ void AEnemySpawner::AssignAIPerceptionConfig(ACharacter* SpawnedCharacter, const
                 UE_LOG(LogTemp, Error, TEXT("Sense: %s"), *SenseConfig->GetName());
                 
                 PerceptionComponent->ConfigureSense( *SenseConfig);
-                
             }
         }
-
+        
+        
         // Set dominant sense
         if (CharacterDataAsset->DominantSense)
         {
@@ -240,6 +295,8 @@ void AEnemySpawner::OnConstruction(const FTransform& Transform)
     }
 }
 
+
+
 void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
 {
     UE_LOG(LogTemp, Warning, TEXT("Called"));
@@ -263,6 +320,8 @@ void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
                         UBlackboardComponent* BlackBoard = AIController->GetBlackboardComponent();
                         FName AIStateBlackboardKey = FName("AIState");
                         BlackBoard->SetValueAsEnum(AIStateBlackboardKey, static_cast<uint8>(EnemyData->EnemyDataAsset->DetectionState));
+                        UStateManagerComponent* StateManager = Enemy->GetComponentByClass<UStateManagerComponent>();
+                        StateManager->SetCurrentState(EnemyData->EnemyDataAsset->DetectionState);
                     }
                 }
                 Index++;

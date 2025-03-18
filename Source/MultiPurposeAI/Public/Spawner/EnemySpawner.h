@@ -122,4 +122,7 @@ private:
     UFUNCTION(BlueprintCallable, Category = "AI|Perception")
     void OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors);
 
+    UFUNCTION()
+    void AddComponentsToCharacter(const UCharacterDataAsset* CharacterDataAsset, ACharacter* SpawnedEnemy);
+
 };

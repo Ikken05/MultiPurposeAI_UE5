@@ -42,6 +42,19 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character|Config")
     TSubclassOf<UAnimInstance> AnimationBlueprint;
 
+public:
+    // Boolean to toggle component selection
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character|Config|Components")
+    bool bEnableComponents = true;
+
+    // List of components to add
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character|Config|Components", meta = (EditCondition = "bEnableComponents"))
+    TArray<TSubclassOf<UActorComponent>> ComponentsToAdd;
+
+    // List of components to add
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Character|Config|Components", meta = (EditCondition = "bEnableComponents"))
+    float MaxHealth;
+
 
     UPROPERTY(EditDefaultsOnly, Instanced, Category = "AI|Perception")
     TArray<TObjectPtr<UAISenseConfig>> SensesConfig;
