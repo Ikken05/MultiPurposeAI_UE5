@@ -72,3 +72,6 @@ Plugins/**/Intermediate/*
 
 # Cache files for the editor to use
 DerivedDataCache/*
+
+#Content/Developers, Developer folder should be local playground for testing asset packs etc
+Content/Developers/
