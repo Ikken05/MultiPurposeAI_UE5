@@ -119,10 +119,18 @@ private:
     UFUNCTION(BlueprintCallable, Category = "AI|Perception")
     void AssignAIPerceptionConfig(ACharacter* SpawnedCharacter, const UCharacterDataAsset* CharacterDataAsset, AAIController* AICharacterController);
 
+    UFUNCTION()
+    void AddComponentsToCharacter(const UCharacterDataAsset* CharacterDataAsset, ACharacter* SpawnedEnemy);
+
     UFUNCTION(BlueprintCallable, Category = "AI|Perception")
     void OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors);
 
-    UFUNCTION()
-    void AddComponentsToCharacter(const UCharacterDataAsset* CharacterDataAsset, ACharacter* SpawnedEnemy);
+    UFUNCTION(BlueprintCallable, Category = "AI|Perception")
+    bool HandlePerceptionForEnemy(ACharacter* Enemy, AActor* PerceivedActor);
+
+    UFUNCTION(BlueprintCallable, Category = "AI|Perception")
+    bool DetermineEnemyReaction(ACharacter* Enemy, AActor* PerceivedActor, const FString& SenseType);
+
+   
 
 };

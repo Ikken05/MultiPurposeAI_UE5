@@ -298,97 +298,117 @@ void AEnemySpawner::AssignAIPerceptionConfig(ACharacter* SpawnedCharacter, const
 
 void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
 {
-    UE_LOG(LogTemp, Warning, TEXT("Called"));
-
-    for (ACharacter* Enemy : SpawnedEnemies)
+    UE_LOG(LogTemp, Warning, TEXT("Perception Updated Called"));
+    bool bPlayerDetected = false;
+    AActor* DetectedActor = nullptr;
+    for (AActor* PerceivedActor : UpdatedActors)
     {
-        if (Enemy)
+        if (!PerceivedActor) continue;
+
+        for (ACharacter* Enemy : SpawnedEnemies)
         {
+            if (!Enemy) continue;
+            bPlayerDetected = HandlePerceptionForEnemy(Enemy, PerceivedActor);
+            DetectedActor = PerceivedActor;
+        }
+    }
+    if (bPlayerDetected)
+    {
+        for (ACharacter* Enemy : SpawnedEnemies)
+        {
+            int32 Index = SpawnedEnemies.IndexOfByKey(Enemy);
+            if (Index == INDEX_NONE || !EnemiesToSpawn.IsValidIndex(Index)) return;
+
+            FEnemySpawnData* EnemyData = &EnemiesToSpawn[Index];
+            if (!EnemyData) return;
+
             AAIController* AIController = Cast<AAIController>(Enemy->GetController());
-            if (!AIController) continue;
+            if (!AIController) return;
 
             UBlackboardComponent* BlackBoard = AIController->GetBlackboardComponent();
+            if (!BlackBoard) return;
+
             FName AIStateBlackboardKey = FName("AIState");
+            FName TargetActorName = FName("TargetActor");
 
-            UAIPerceptionComponent* PerceptionComponent = AIController->FindComponentByClass<UAIPerceptionComponent>();
-            if (!PerceptionComponent) continue;
+            BlackBoard->SetValueAsEnum(AIStateBlackboardKey, static_cast<uint8>(EnemyData->EnemyDataAsset->DetectionState));
+            BlackBoard->SetValueAsObject(TargetActorName, DetectedActor);
+            BlackBoard->SetValueAsVector(FName("TargetLocation"), DetectedActor->GetActorLocation());
 
-            TArray<AActor*> PerceivedActors;
-            PerceptionComponent->GetCurrentlyPerceivedActors(nullptr, PerceivedActors);
+            AIController->RunBehaviorTree(EnemyData->EnemyDataAsset->MainBT);
 
-            for (AActor* PerceivedActor : PerceivedActors)
+            if (EnemyData->EnemyDataAsset->bEnableComponents)
             {
-                FActorPerceptionBlueprintInfo ActorInfo;
-                PerceptionComponent->GetActorsPerception(PerceivedActor, ActorInfo);
-
-                for (const FAIStimulus& Stimulus : ActorInfo.LastSensedStimuli)
-                {
-                    TSubclassOf<UAISense> SenseClass = UAIPerceptionSystem::GetSenseClassForStimulus(GetWorld(), Stimulus);
-
-                    if (!SenseClass) continue;
-
-                    FString SenseType = SenseClass->GetName();
-                    UE_LOG(LogTemp, Warning, TEXT("Enemy %s detected %s with sense: %s"), *Enemy->GetName(), *PerceivedActor->GetName(), *SenseType);
-
-                    int32 Index = SpawnedEnemies.IndexOfByKey(Enemy);
-                    if (Index != INDEX_NONE && EnemiesToSpawn.IsValidIndex(Index))
-                    {
-                        FEnemySpawnData* EnemyData = &EnemiesToSpawn[Index];
-
-                        if (SenseType == "AISense_Sight" || SenseType == "AISense_Hearing" || SenseType == "AISense_Damage")
-                        {
-                            BlackBoard->SetValueAsEnum(AIStateBlackboardKey, static_cast<uint8>(EnemyData->EnemyDataAsset->DetectionState));
-                            if (EnemyData->EnemyDataAsset->bEnableComponents)
-                            {
-                                UStateManagerComponent* StateManager = Enemy->GetComponentByClass<UStateManagerComponent>();
-                                StateManager->SetCurrentState(EnemyData->EnemyDataAsset->DetectionState);
-                            }
-                        }
-                    }
-                }
+                UStateManagerComponent* StateManager = Enemy->GetComponentByClass<UStateManagerComponent>();
+                if (StateManager)
+                    StateManager->SetCurrentState(EnemyData->EnemyDataAsset->DetectionState);
             }
         }
     }
+
 }
 
-
-
-
-
-/*void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
+bool AEnemySpawner::HandlePerceptionForEnemy(ACharacter* Enemy, AActor* PerceivedActor)
 {
-    UE_LOG(LogTemp, Warning, TEXT("Called"));
-    // Handle perception updates
-    for (AActor* Actor : UpdatedActors)
+    AAIController* AIController = Cast<AAIController>(Enemy->GetController());
+    if (!AIController) return false;
+
+    UBlackboardComponent* BlackBoard = AIController->GetBlackboardComponent();
+    if (!BlackBoard) return false;
+
+    UAIPerceptionComponent* PerceptionComponent = AIController->FindComponentByClass<UAIPerceptionComponent>();
+    if (!PerceptionComponent) return false;
+
+    FActorPerceptionBlueprintInfo ActorInfo;
+    PerceptionComponent->GetActorsPerception(PerceivedActor, ActorInfo);
+
+    for (const FAIStimulus& Stimulus : ActorInfo.LastSensedStimuli)
     {
-        if (Actor)
-        {
-            UE_LOG(LogTemp, Warning, TEXT("Perceived Actor: %s"), *Actor->GetName());
+        TSubclassOf<UAISense> SenseClass = UAIPerceptionSystem::GetSenseClassForStimulus(GetWorld(), Stimulus);
+        if (!SenseClass) continue;
 
-            int32 Index = 0;
-            for (ACharacter* Enemy : SpawnedEnemies)
-            {
-                if (Enemy)
-                {
-                    FEnemySpawnData* EnemyData = &EnemiesToSpawn[Index];
+        FString SenseType = SenseClass->GetName();
+        UE_LOG(LogTemp, Warning, TEXT("Enemy %s detected %s with sense: %s"), *Enemy->GetName(), *PerceivedActor->GetName(), *SenseType);
 
-                    AAIController* AIController = Cast<AAIController>(Enemy->GetController());
-                    if (AIController)
-                    {
-                        UBlackboardComponent* BlackBoard = AIController->GetBlackboardComponent();
-                        FName AIStateBlackboardKey = FName("AIState");
-                        BlackBoard->SetValueAsEnum(AIStateBlackboardKey, static_cast<uint8>(EnemyData->EnemyDataAsset->DetectionState));
-                        if(EnemyData->EnemyDataAsset->bEnableComponents)
-                        {
-                            UStateManagerComponent* StateManager = Enemy->GetComponentByClass<UStateManagerComponent>();
-                            StateManager->SetCurrentState(EnemyData->EnemyDataAsset->DetectionState);
-                        }
-                    }
-                }
-                Index++;
-            }
-        }
+        return DetermineEnemyReaction(Enemy, PerceivedActor, SenseType);
     }
+    return true;
 }
 
-*/
+bool AEnemySpawner::DetermineEnemyReaction(ACharacter* Enemy, AActor* PerceivedActor, const FString& SenseType)
+{
+    bool bPlayerDetected = false;
+    int32 Index = SpawnedEnemies.IndexOfByKey(Enemy);
+    if (Index == INDEX_NONE || !EnemiesToSpawn.IsValidIndex(Index)) return false;
+
+    FEnemySpawnData* EnemyData = &EnemiesToSpawn[Index];
+    if (!EnemyData) return false;
+
+    AAIController* AIController = Cast<AAIController>(Enemy->GetController());
+    if (!AIController) return false;
+
+    UBlackboardComponent* BlackBoard = AIController->GetBlackboardComponent();
+    if (!BlackBoard) return false;
+
+    FName AIStateBlackboardKey = FName("AIState");
+    FName TargetActorName = FName("TargetActor");
+
+    if (SenseType == "AISense_Sight"|| SenseType == "AISense_Hearing" || SenseType == "AISense_Damage")
+    {
+        BlackBoard->SetValueAsEnum(AIStateBlackboardKey, static_cast<uint8>(EnemyData->EnemyDataAsset->DetectionState));
+        BlackBoard->SetValueAsObject(TargetActorName, PerceivedActor);
+
+        if (EnemyData->EnemyDataAsset->bEnableComponents)
+        {
+            UStateManagerComponent* StateManager = Enemy->GetComponentByClass<UStateManagerComponent>();
+            if (StateManager)
+                StateManager->SetCurrentState(EnemyData->EnemyDataAsset->DetectionState);
+        }
+        return true;
+    }
+    return true;
+}
+
+
+
+

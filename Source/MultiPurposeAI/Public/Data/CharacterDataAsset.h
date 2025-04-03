@@ -71,6 +71,10 @@ public:
     EAICharacterState DetectionState;
 
     // Subtrees mapping for different behaviors
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Behavior")
+    EAICharacterState SuspicionState;
+
+    // Subtrees mapping for different behaviors
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "AI|Behavior|MainTree")
     UBehaviorTree* MainBT;
 
