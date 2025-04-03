@@ -22,6 +22,49 @@ AEnemySpawner::AEnemySpawner()
     DefaultAnimBlueprint = nullptr;
 }
 
+void AEnemySpawner::OnConstruction(const FTransform& Transform)
+{
+    Super::OnConstruction(Transform);
+
+    if (bShowSpawnPoints)
+    {
+        // Clear existing debug spheres
+        FlushPersistentDebugLines(GetWorld());
+
+        for (const FEnemySpawnData& EnemyData : EnemiesToSpawn)
+        {
+            if (EnemyData.SpawnTransform.GetLocation() != FVector::ZeroVector)
+            {
+
+                DrawDebugSphere(
+                    GetWorld(),
+                    EnemyData.SpawnTransform.GetLocation(),
+                    EnemyData.DebugSphereRadius,
+                    EnemyData.NumberOfSegments,
+                    EnemyData.SphereColor,
+                    EnemyData.bPersistenLine,
+                    EnemyData.Duration
+                );
+                // Draw a debug arrow to indicate the rotation
+                FVector Start = EnemyData.SpawnTransform.GetLocation();
+                FVector ForwardVector = EnemyData.SpawnTransform.GetRotation().Vector();
+                FVector ArrowEnd = Start + (ForwardVector * EnemyData.ArrowLength);
+                DrawDebugDirectionalArrow(
+                    GetWorld(),
+                    EnemyData.SpawnTransform.GetLocation(),
+                    ArrowEnd,
+                    EnemyData.DebugSphereRadius,       // Arrow size
+                    EnemyData.SphereColor, // Color
+                    EnemyData.bPersistenLine,        // Persistent
+                    EnemyData.Duration,         // Never expires
+                    0,            // Depth priority
+                    EnemyData.ArrowThickness          // Arrow thickness
+                );
+            }
+        }
+    }
+}
+
 void AEnemySpawner::BeginPlay()
 {
     for (const FEnemySpawnData& EnemyData : EnemiesToSpawn)
@@ -252,44 +295,57 @@ void AEnemySpawner::AssignAIPerceptionConfig(ACharacter* SpawnedCharacter, const
     }
 }
 
-void AEnemySpawner::OnConstruction(const FTransform& Transform)
+
+void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
 {
-    Super::OnConstruction(Transform);
+    UE_LOG(LogTemp, Warning, TEXT("Called"));
 
-    if (bShowSpawnPoints)
+    for (ACharacter* Enemy : SpawnedEnemies)
     {
-        // Clear existing debug spheres
-        FlushPersistentDebugLines(GetWorld());
-
-        for (const FEnemySpawnData& EnemyData : EnemiesToSpawn)
+        if (Enemy)
         {
-            if (EnemyData.SpawnTransform.GetLocation() != FVector::ZeroVector)
-            {
+            AAIController* AIController = Cast<AAIController>(Enemy->GetController());
+            if (!AIController) continue;
 
-                DrawDebugSphere(
-                    GetWorld(),
-                    EnemyData.SpawnTransform.GetLocation(),
-                    EnemyData.DebugSphereRadius,
-                    EnemyData.NumberOfSegments,
-                    EnemyData.SphereColor,
-                    EnemyData.bPersistenLine,
-                    EnemyData.Duration      
-                );
-                // Draw a debug arrow to indicate the rotation
-                FVector Start = EnemyData.SpawnTransform.GetLocation();
-                FVector ForwardVector = EnemyData.SpawnTransform.GetRotation().Vector();
-                FVector ArrowEnd = Start + (ForwardVector * EnemyData.ArrowLength);
-                DrawDebugDirectionalArrow(
-                    GetWorld(),
-                    EnemyData.SpawnTransform.GetLocation(),
-                    ArrowEnd,
-                    EnemyData.DebugSphereRadius,       // Arrow size
-                    EnemyData.SphereColor, // Color
-                    EnemyData.bPersistenLine,        // Persistent
-                    EnemyData.Duration,         // Never expires
-                    0,            // Depth priority
-                    EnemyData.ArrowThickness          // Arrow thickness
-                );
+            UBlackboardComponent* BlackBoard = AIController->GetBlackboardComponent();
+            FName AIStateBlackboardKey = FName("AIState");
+
+            UAIPerceptionComponent* PerceptionComponent = AIController->FindComponentByClass<UAIPerceptionComponent>();
+            if (!PerceptionComponent) continue;
+
+            TArray<AActor*> PerceivedActors;
+            PerceptionComponent->GetCurrentlyPerceivedActors(nullptr, PerceivedActors);
+
+            for (AActor* PerceivedActor : PerceivedActors)
+            {
+                FActorPerceptionBlueprintInfo ActorInfo;
+                PerceptionComponent->GetActorsPerception(PerceivedActor, ActorInfo);
+
+                for (const FAIStimulus& Stimulus : ActorInfo.LastSensedStimuli)
+                {
+                    TSubclassOf<UAISense> SenseClass = UAIPerceptionSystem::GetSenseClassForStimulus(GetWorld(), Stimulus);
+
+                    if (!SenseClass) continue;
+
+                    FString SenseType = SenseClass->GetName();
+                    UE_LOG(LogTemp, Warning, TEXT("Enemy %s detected %s with sense: %s"), *Enemy->GetName(), *PerceivedActor->GetName(), *SenseType);
+
+                    int32 Index = SpawnedEnemies.IndexOfByKey(Enemy);
+                    if (Index != INDEX_NONE && EnemiesToSpawn.IsValidIndex(Index))
+                    {
+                        FEnemySpawnData* EnemyData = &EnemiesToSpawn[Index];
+
+                        if (SenseType == "AISense_Sight" || SenseType == "AISense_Hearing" || SenseType == "AISense_Damage")
+                        {
+                            BlackBoard->SetValueAsEnum(AIStateBlackboardKey, static_cast<uint8>(EnemyData->EnemyDataAsset->DetectionState));
+                            if (EnemyData->EnemyDataAsset->bEnableComponents)
+                            {
+                                UStateManagerComponent* StateManager = Enemy->GetComponentByClass<UStateManagerComponent>();
+                                StateManager->SetCurrentState(EnemyData->EnemyDataAsset->DetectionState);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -297,7 +353,9 @@ void AEnemySpawner::OnConstruction(const FTransform& Transform)
 
 
 
-void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
+
+
+/*void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
 {
     UE_LOG(LogTemp, Warning, TEXT("Called"));
     // Handle perception updates
@@ -320,8 +378,11 @@ void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
                         UBlackboardComponent* BlackBoard = AIController->GetBlackboardComponent();
                         FName AIStateBlackboardKey = FName("AIState");
                         BlackBoard->SetValueAsEnum(AIStateBlackboardKey, static_cast<uint8>(EnemyData->EnemyDataAsset->DetectionState));
-                        UStateManagerComponent* StateManager = Enemy->GetComponentByClass<UStateManagerComponent>();
-                        StateManager->SetCurrentState(EnemyData->EnemyDataAsset->DetectionState);
+                        if(EnemyData->EnemyDataAsset->bEnableComponents)
+                        {
+                            UStateManagerComponent* StateManager = Enemy->GetComponentByClass<UStateManagerComponent>();
+                            StateManager->SetCurrentState(EnemyData->EnemyDataAsset->DetectionState);
+                        }
                     }
                 }
                 Index++;
@@ -330,4 +391,4 @@ void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
     }
 }
 
-
+*/
