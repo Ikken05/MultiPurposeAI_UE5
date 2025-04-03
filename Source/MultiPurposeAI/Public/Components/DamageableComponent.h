@@ -31,6 +31,7 @@ public:
     virtual float GetCurrentHealth() const override;
     UFUNCTION(BlueprintCallable, BlueprintPure)
     virtual float GetMaxHealth() const override;
+    UFUNCTION(BlueprintCallable)
     virtual void TakeDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType,
         AController* InstigatedBy, AActor* DamageCauser) override;
     virtual void SetMaxHealth(float MaxHealth) override;

@@ -23,6 +23,7 @@ void UDamageableComponent::BeginPlay()
 	if (Owner)
 	{
 		Owner->OnTakeAnyDamage.AddDynamic(this, &UDamageableComponent::TakeDamage);
+		UE_LOG(LogTemp, Error, TEXT("Bound"));
 	}
 }
 
