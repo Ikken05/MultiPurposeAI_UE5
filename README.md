@@ -8,8 +8,9 @@ The **Enemy Spawner System** is a flexible, data-driven solution for dynamically
 
 👤 **[Mahdi Ikken]**  
 🎮 Gameplay Programmer | AI Systems | Unreal Engine 5  
-⏺️ Youtube Video Will soon be uploaded on my [Youtube Channel](https://www.youtube.com/@Hissatsui)
-📫 Reach me on [LinkedIn](https://www.linkedin.com/in/ikken-mahdi/) [LinkTree](https://linktr.ee/Ikken_) 
+⏺️ Youtube Video will soon be uploaded on my [Youtube Channel](https://www.youtube.com/@Hissatsui)  
+📫 Reach me on [LinkedIn](https://www.linkedin.com/in/ikken-mahdi/)  
+🔗 My Links [LinkTree](https://linktr.ee/Ikken_)  
 
 ## 🚀 Features
 
