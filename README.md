@@ -4,6 +4,7 @@ The **Enemy Spawner System** is a flexible, data-driven solution for dynamically
 
 ---
 
+
 ## 🧑‍💻 Author
 
 👤 **[Mahdi Ikken]**  
@@ -138,3 +139,12 @@ Content/
 * Project should support AI Module (AIPerception, BehaviorTree, etc.)
 
 * Character class must support custom components (e.g., health)
+
+
+---
+
+
+## 📄 License
+
+This project is licensed under the [MIT License](LICENSE).
+
