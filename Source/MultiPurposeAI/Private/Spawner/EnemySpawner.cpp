@@ -7,6 +7,7 @@
 #include "BehaviorTree/BehaviorTree.h"
 #include "AIController.h"
 #include "Enums.h"
+#include "Kismet/GameplayStatics.h"
 #include "Components/StateManagerComponent.h"
 #include "Components/DamageableComponent.h"
 #include "Perception/AIPerceptionComponent.h"
@@ -168,8 +169,9 @@ void AEnemySpawner::InitializeEnemy(ACharacter* SpawnedCharacter, const UCharact
                     // Get the display name of the enum value (e.g., "Patrol" instead of "EAICharacterState::Patrol")
                     FString StateString = *AIState->GetNameStringByValue((int64)State);
                     // Create the blackboard key with the format EnumName + "SubTree"
-                    FString BlackboardKeyString = StateString + "SubTree";
+                    FString BlackboardKeyString = "SBT_" + StateString;
                     FName BlackboardKey = FName(*BlackboardKeyString);
+                    UE_LOG(LogTemp, Warning, TEXT("%s"), &StateString);
 
                     // Set the behavior tree as an object in the blackboard
                     BlackboardComp->SetValueAsObject(BlackboardKey, Subtree);
@@ -301,15 +303,19 @@ void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
     UE_LOG(LogTemp, Warning, TEXT("Perception Updated Called"));
     bool bPlayerDetected = false;
     AActor* DetectedActor = nullptr;
+    ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
     for (AActor* PerceivedActor : UpdatedActors)
     {
         if (!PerceivedActor) continue;
 
-        for (ACharacter* Enemy : SpawnedEnemies)
+        if (PerceivedActor != PlayerCharacter) 
         {
-            if (!Enemy) continue;
-            bPlayerDetected = HandlePerceptionForEnemy(Enemy, PerceivedActor);
-            DetectedActor = PerceivedActor;
+            for (ACharacter* Enemy : SpawnedEnemies)
+            {
+                if (!Enemy) continue;
+                bPlayerDetected = HandlePerceptionForEnemy(Enemy, PerceivedActor);
+                DetectedActor = PerceivedActor;
+            }
         }
     }
     if (bPlayerDetected)
@@ -345,7 +351,6 @@ void AEnemySpawner::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
             }
         }
     }
-
 }
 
 bool AEnemySpawner::HandlePerceptionForEnemy(ACharacter* Enemy, AActor* PerceivedActor)
